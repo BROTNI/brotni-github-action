@@ -1,0 +1,54 @@
+name: Brotni Simulation – Wait for Result and Gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Submit candidate and wait for simulation result
+        id: brotni
+        uses: BROTNI/brotni-github-action@v1
+        with:
+          brotni-api-url: ${{ vars.BROTNI_API_URL }}
+          brotni-token: ${{ secrets.BROTNI_TOKEN }}
+          simulation-spec: simulation.yml
+          context-spec: contexts/staging.yml
+          candidate-name: PR-${{ github.event.pull_request.number }}
+          campaign-id: ${{ vars.BROTNI_CAMPAIGN_ID }}
+          wait: 'true'
+          wait-timeout: '900'     # wait up to 15 minutes
+          wait-interval: '30'     # poll every 30 seconds
+          publish-comment: 'true'
+          publish-check: 'true'
+
+      # Fail the workflow if the simulation failed
+      - name: Gate on simulation result
+        if: steps.brotni.outputs.simulation-status == 'failed'
+        run: |
+          echo "::error::Simulation failed. See report: ${{ steps.brotni.outputs.simulation-report-url }}"
+          exit 1
+
+      # Warn but continue if simulation timed out
+      - name: Warn on timeout
+        if: steps.brotni.outputs.simulation-status == 'timeout'
+        run: |
+          echo "::warning::Simulation did not finish within the wait-timeout. Check the report manually:"
+          echo "${{ steps.brotni.outputs.simulation-report-url }}"
+
+      - name: Print all simulation outputs
+        if: always()
+        run: |
+          echo "Candidate ID : ${{ steps.brotni.outputs.candidate-id }}"
+          echo "Run ID       : ${{ steps.brotni.outputs.simulation-run-id }}"
+          echo "Status       : ${{ steps.brotni.outputs.simulation-status }}"
+          echo "Score        : ${{ steps.brotni.outputs.simulation-score }}"
+          echo "Report       : ${{ steps.brotni.outputs.simulation-report-url }}"

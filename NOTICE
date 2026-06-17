@@ -1,0 +1,13 @@
+brotni-github-action
+Copyright 2024 BROTNI
+
+This product is licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+This product includes software and tooling developed by BROTNI
+for integration with Brotni-compatible simulation workflows.
+
+Third-party dependencies used at runtime are listed in dist/licenses.txt
+when built with @vercel/ncc.
