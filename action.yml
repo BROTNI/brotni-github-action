@@ -1,0 +1,113 @@
+name: 'Brotni Simulation'
+description: >
+  Submit a GitHub pull request, commit, or OCI artifact as a candidate to a
+  Brotni-compatible simulation workflow and publish the resulting status back
+  to GitHub.
+author: 'BROTNI'
+
+branding:
+  icon: 'activity'
+  color: 'blue'
+
+inputs:
+  brotni-api-url:
+    description: >
+      Base URL of the Brotni-compatible simulation API endpoint.
+      Falls back to the BROTNI_API_URL environment variable.
+    required: false
+
+  brotni-token:
+    description: >
+      Authentication token for the Brotni API.
+      Falls back to the BROTNI_TOKEN environment variable.
+    required: false
+
+  simulation-spec:
+    description: 'Path or URI of the simulation specification file.'
+    required: false
+
+  execution-recipe:
+    description: 'Path or URI of the execution recipe.'
+    required: false
+
+  context-spec:
+    description: 'Path or URI of the context specification.'
+    required: false
+
+  artifact-uri:
+    description: >
+      URI of the artifact to submit as a simulation candidate
+      (e.g. an OCI image reference such as ghcr.io/org/image:tag).
+    required: false
+
+  artifact-digest:
+    description: >
+      Content-addressable digest of the artifact (e.g. sha256:abc123...).
+      Use this with artifact-uri to pin an immutable reference.
+    required: false
+
+  candidate-name:
+    description: 'Human-readable name for this simulation candidate.'
+    required: false
+
+  campaign-id:
+    description: 'Brotni campaign ID to associate this candidate with.'
+    required: false
+
+  wait:
+    description: 'Wait for the simulation to complete before the step exits.'
+    required: false
+    default: 'false'
+
+  wait-timeout:
+    description: 'Maximum seconds to wait for simulation completion when wait=true.'
+    required: false
+    default: '600'
+
+  wait-interval:
+    description: 'Polling interval in seconds when wait=true.'
+    required: false
+    default: '30'
+
+  publish-comment:
+    description: >
+      Post a PR comment with a link to the simulation report.
+      Requires pull-requests: write permission and a pull_request event.
+    required: false
+    default: 'false'
+
+  publish-check:
+    description: >
+      Create a GitHub Check Run with the simulation result.
+      Requires checks: write permission.
+    required: false
+    default: 'false'
+
+  github-token:
+    description: >
+      GitHub token used to post comments and check runs.
+      Defaults to the automatically provided github.token.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  candidate-id:
+    description: 'Unique identifier of the submitted simulation candidate.'
+
+  simulation-run-id:
+    description: 'Identifier of the triggered simulation run.'
+
+  simulation-report-url:
+    description: 'URL to the simulation report.'
+
+  simulation-status:
+    description: >
+      Final status of the simulation: passed, failed, running, pending, or timeout.
+      Only meaningful when wait=true; otherwise returns the status at submission time.
+
+  simulation-score:
+    description: 'Numeric score returned by the simulation, if available.'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

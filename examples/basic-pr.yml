@@ -1,0 +1,38 @@
+name: Brotni Simulation – Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Submit PR to Brotni Simulation
+        id: brotni
+        uses: BROTNI/brotni-github-action@v1
+        with:
+          brotni-api-url: ${{ vars.BROTNI_API_URL }}
+          brotni-token: ${{ secrets.BROTNI_TOKEN }}
+          simulation-spec: simulation.yml
+          candidate-name: ${{ github.event.pull_request.title }}
+          campaign-id: ${{ vars.BROTNI_CAMPAIGN_ID }}
+          wait: 'true'
+          publish-comment: 'true'
+          publish-check: 'true'
+
+      - name: Print simulation outputs
+        if: always()
+        run: |
+          echo "Candidate ID : ${{ steps.brotni.outputs.candidate-id }}"
+          echo "Run ID       : ${{ steps.brotni.outputs.simulation-run-id }}"
+          echo "Status       : ${{ steps.brotni.outputs.simulation-status }}"
+          echo "Score        : ${{ steps.brotni.outputs.simulation-score }}"
+          echo "Report       : ${{ steps.brotni.outputs.simulation-report-url }}"
