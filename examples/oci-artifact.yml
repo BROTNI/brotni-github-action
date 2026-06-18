@@ -1,0 +1,55 @@
+name: Brotni Simulation – OCI Artifact
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write   # needed to push to GHCR
+  checks: write
+
+jobs:
+  build-and-simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push OCI image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      # artifact-digest pins an immutable reference so Brotni can fetch
+      # exactly the image that was built, regardless of tag mutations.
+      - name: Submit OCI artifact to Brotni Simulation
+        id: brotni
+        uses: BROTNI/brotni-github-action@v1
+        with:
+          brotni-api-url: ${{ vars.BROTNI_API_URL }}
+          brotni-token: ${{ secrets.BROTNI_TOKEN }}
+          artifact-uri: ghcr.io/${{ github.repository }}:${{ github.sha }}
+          artifact-digest: ${{ steps.build.outputs.digest }}
+          simulation-spec: simulation.yml
+          execution-recipe: recipes/container.yml
+          candidate-name: ${{ github.repository }}@${{ github.sha }}
+          wait: 'true'
+          publish-check: 'true'
+
+      - name: Print simulation outputs
+        if: always()
+        run: |
+          echo "Candidate ID : ${{ steps.brotni.outputs.candidate-id }}"
+          echo "Status       : ${{ steps.brotni.outputs.simulation-status }}"
+          echo "Score        : ${{ steps.brotni.outputs.simulation-score }}"
+          echo "Report       : ${{ steps.brotni.outputs.simulation-report-url }}"
