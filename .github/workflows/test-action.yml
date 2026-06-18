@@ -1,0 +1,37 @@
+name: Test Action
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Run action (smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run brotni-github-action
+        id: brotni
+        uses: ./
+        continue-on-error: true
+        with:
+          brotni-api-url: ${{ vars.BROTNI_API_URL || 'https://example.invalid' }}
+          brotni-token: ${{ secrets.BROTNI_TOKEN || 'dummy-token' }}
+          candidate-name: 'CI smoke test'
+          wait: 'false'
+          publish-comment: 'false'
+          publish-check: 'false'
+
+      - name: Show outputs
+        run: |
+          echo "Candidate ID : ${{ steps.brotni.outputs.candidate-id }}"
+          echo "Run ID       : ${{ steps.brotni.outputs.simulation-run-id }}"
+          echo "Status       : ${{ steps.brotni.outputs.simulation-status }}"
+          echo "Score        : ${{ steps.brotni.outputs.simulation-score }}"
+          echo "Report       : ${{ steps.brotni.outputs.simulation-report-url }}"
