@@ -4,7 +4,7 @@
   "description": "GitHub Action for submitting PR, commit, and OCI artifact candidates to Brotni-compatible simulation workflows",
   "main": "dist/index.js",
   "scripts": {
-    "build": "ncc build src/index.js -o dist --source-map --license dist/licenses.txt",
+    "build": "ncc build src/index.js -o dist --source-map --license licenses.txt",
     "test": "jest --coverage",
     "lint": "eslint src/ --ext .js"
   },
