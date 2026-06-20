@@ -1,8 +1,8 @@
 name: 'Brotni Simulation'
 description: >
-  Submit a GitHub pull request, commit, or OCI artifact as a candidate to a
-  Brotni-compatible simulation workflow and publish the resulting status back
-  to GitHub.
+  Register a GitHub pull request, commit, or OCI artifact as a candidate in an
+  existing Brotni simulation campaign and publish a campaign-scoped check/comment
+  back to GitHub. Registration is idempotent by candidate name.
 author: 'BROTNI'
 
 branding:
@@ -22,16 +22,8 @@ inputs:
       Falls back to the BROTNI_TOKEN environment variable.
     required: false
 
-  simulation-spec:
-    description: 'Path or URI of the simulation specification file.'
-    required: false
-
   execution-recipe:
-    description: 'Path or URI of the execution recipe.'
-    required: false
-
-  context-spec:
-    description: 'Path or URI of the context specification.'
+    description: 'Path or URI of the execution recipe used to run this candidate.'
     required: false
 
   artifact-uri:
@@ -51,14 +43,10 @@ inputs:
     required: false
 
   campaign-id:
-    description: 'Brotni campaign ID to associate this candidate with.'
-    required: false
-
-  work-item:
     description: >
-      Work item this candidate contributes to (e.g. an issue number or URL).
-      Used to group candidates into a campaign via discovery.
-    required: false
+      Brotni campaign ID to register this candidate with. Required — the action
+      registers the build as a candidate in an existing campaign.
+    required: true
 
   candidate-label:
     description: >
@@ -73,31 +61,17 @@ inputs:
       Inferred from the artifact inputs when omitted.
     required: false
 
-  wait:
-    description: 'Wait for the simulation to complete before the step exits.'
-    required: false
-    default: 'false'
-
-  wait-timeout:
-    description: 'Maximum seconds to wait for simulation completion when wait=true.'
-    required: false
-    default: '600'
-
-  wait-interval:
-    description: 'Polling interval in seconds when wait=true.'
-    required: false
-    default: '30'
-
   publish-comment:
     description: >
-      Post a PR comment with a link to the simulation report.
-      Requires pull-requests: write permission and a pull_request event.
+      Post a campaign-scoped PR comment with this candidate's status and a link
+      to the campaign comparison. Requires pull-requests: write and a
+      pull_request event.
     required: false
     default: 'false'
 
   publish-check:
     description: >
-      Create a GitHub Check Run with the simulation result.
+      Create a GitHub Check Run with the campaign-scoped result.
       Requires checks: write permission.
     required: false
     default: 'false'
@@ -111,24 +85,18 @@ inputs:
 
 outputs:
   candidate-id:
-    description: 'Unique identifier of the submitted simulation candidate.'
-
-  simulation-run-id:
-    description: 'Identifier of the triggered simulation run.'
-
-  simulation-report-url:
-    description: 'URL to the simulation report.'
+    description: 'Studio-minted identifier of the registered candidate.'
 
   campaign-url:
-    description: 'URL to the campaign comparison view, when the candidate belongs to a campaign.'
+    description: 'URL to the campaign comparison view, when provided by the studio.'
 
   simulation-status:
     description: >
-      Final status of the simulation: passed, failed, running, pending, or timeout.
-      Only meaningful when wait=true; otherwise returns the status at submission time.
+      Candidate status: "registered" right after registration, or "passed" /
+      "failed" once the campaign decision includes this candidate.
 
   simulation-score:
-    description: 'Numeric score returned by the simulation, if available.'
+    description: "This candidate's overall score from the campaign decision, if available."
 
 runs:
   using: 'node20'

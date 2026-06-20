@@ -60,12 +60,26 @@ function base(apiUrl) {
   return apiUrl.replace(/\/$/, '');
 }
 
-async function submitCandidate(apiUrl, token, payload) {
-  return request(`${base(apiUrl)}/api/v1/candidates`, 'POST', token, payload);
+// registerCandidate registers the build as a candidate in an existing campaign.
+// The simulation-engine owns the campaign domain; the studio-api BFF exposes it
+// under /api/v1/campaigns. Registration is idempotent by candidate name.
+async function registerCandidate(apiUrl, token, campaignId, payload) {
+  return request(
+    `${base(apiUrl)}/api/v1/campaigns/${encodeURIComponent(campaignId)}/candidates`,
+    'POST',
+    token,
+    payload
+  );
 }
 
-async function fetchStatus(apiUrl, token, candidateId) {
-  return request(`${base(apiUrl)}/api/v1/candidates/${candidateId}/status`, 'GET', token);
+// fetchDecision reads the campaign decision report (best-effort) to surface this
+// candidate's rank and score. It is empty until run metrics have been ingested.
+async function fetchDecision(apiUrl, token, campaignId) {
+  return request(
+    `${base(apiUrl)}/api/v1/campaigns/${encodeURIComponent(campaignId)}/decision`,
+    'GET',
+    token
+  );
 }
 
-module.exports = { submitCandidate, fetchStatus };
+module.exports = { registerCandidate, fetchDecision };
