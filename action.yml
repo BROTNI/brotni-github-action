@@ -54,6 +54,25 @@ inputs:
     description: 'Brotni campaign ID to associate this candidate with.'
     required: false
 
+  work-item:
+    description: >
+      Work item this candidate contributes to (e.g. an issue number or URL).
+      Used to group candidates into a campaign via discovery.
+    required: false
+
+  candidate-label:
+    description: >
+      PR label that marks a pull request as a campaign candidate for
+      label-based discovery.
+    required: false
+    default: 'brotni-simulation-candidate'
+
+  source-kind:
+    description: >
+      Candidate source kind: git_change, container_image, or config_bundle.
+      Inferred from the artifact inputs when omitted.
+    required: false
+
   wait:
     description: 'Wait for the simulation to complete before the step exits.'
     required: false
@@ -99,6 +118,9 @@ outputs:
 
   simulation-report-url:
     description: 'URL to the simulation report.'
+
+  campaign-url:
+    description: 'URL to the campaign comparison view, when the candidate belongs to a campaign.'
 
   simulation-status:
     description: >

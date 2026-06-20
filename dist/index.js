@@ -30019,31 +30019,53 @@ async function updateCheckRun(octokit, owner, repo, checkRunId, data) {
   return octokit.rest.checks.update({ owner, repo, check_run_id: checkRunId, ...data });
 }
 
-function buildCommentBody(candidateId, simRunId, finalStatus, finalScore, reportUrl) {
+// rankLine renders a "Candidate N of M" badge when campaign ranking is known.
+function rankLine(campaign) {
+  if (!campaign) return null;
+  if (campaign.rank && campaign.total) {
+    return `- **Campaign candidate:** ${campaign.rank} of ${campaign.total}`;
+  }
+  if (campaign.total) {
+    return `- **Campaign candidates:** ${campaign.total}`;
+  }
+  return null;
+}
+
+function buildCommentBody(candidateId, simRunId, finalStatus, finalScore, reportUrl, campaign) {
   const emoji = { passed: '✅', failed: '❌', timeout: '⏱️' }[finalStatus] || '🔵';
+  const heading = campaign && campaign.id ? 'Brotni Simulation Campaign' : 'Brotni Simulation';
   const lines = [
-    `## ${emoji} Brotni Simulation`,
+    `## ${emoji} ${heading}`,
     '',
+    campaign && campaign.id ? `- **Campaign:** \`${campaign.id}\`` : null,
     `- **Candidate ID:** \`${candidateId}\``,
     simRunId ? `- **Run ID:** \`${simRunId}\`` : null,
+    rankLine(campaign),
     `- **Status:** ${finalStatus}`,
     finalScore ? `- **Score:** ${finalScore}` : null,
-    reportUrl ? '' : null,
+    '',
     reportUrl ? `[View simulation report](${reportUrl})` : null,
+    campaign && campaign.url ? `[Compare candidates in this campaign](${campaign.url})` : null,
     '',
     '_This action does not run simulations itself. It submits candidates to a Brotni-compatible simulation workflow and publishes the resulting status back to GitHub._',
   ];
   return lines.filter((l) => l !== null).join('\n');
 }
 
-function buildCheckOutput(candidateId, simRunId, finalStatus, finalScore) {
+function buildCheckOutput(candidateId, simRunId, finalStatus, finalScore, campaign) {
   const summary = [
+    campaign && campaign.id ? `**Campaign:** \`${campaign.id}\`` : null,
     `**Candidate ID:** \`${candidateId}\``,
     simRunId ? `**Run ID:** \`${simRunId}\`` : null,
+    rankLine(campaign) ? rankLine(campaign).replace(/^- /, '') : null,
     `**Status:** ${finalStatus}`,
     finalScore ? `**Score:** ${finalScore}` : null,
+    campaign && campaign.url ? `[Compare candidates](${campaign.url})` : null,
   ].filter(Boolean).join('\n');
-  return { title: `Brotni Simulation — ${finalStatus}`, summary };
+  const title = campaign && campaign.id
+    ? `Brotni Simulation Campaign — ${finalStatus}`
+    : `Brotni Simulation — ${finalStatus}`;
+  return { title, summary };
 }
 
 module.exports = {
@@ -32016,6 +32038,9 @@ async function run() {
   const artifactDigest = core.getInput('artifact-digest');
   const candidateName = core.getInput('candidate-name');
   const campaignId = core.getInput('campaign-id');
+  const workItem = core.getInput('work-item');
+  const candidateLabel = core.getInput('candidate-label') || 'brotni-simulation-candidate';
+  const sourceKind = core.getInput('source-kind');
   const shouldWait = core.getBooleanInput('wait');
   const waitTimeout = parseInt(core.getInput('wait-timeout') || '600', 10);
   const waitInterval = parseInt(core.getInput('wait-interval') || '30', 10);
@@ -32042,9 +32067,19 @@ async function run() {
   const pr = eventPayload && eventPayload.pull_request;
   const prNumber = pr ? pr.number : null;
 
+  // Label-based discovery: a PR carrying the candidate label is registered as a
+  // campaign candidate. The studio reconciles it against the linked work item.
+  const prLabels = (pr && Array.isArray(pr.labels) ? pr.labels.map((l) => l.name) : []);
+  const discoveredByLabel = prLabels.includes(candidateLabel);
+  const discoveredVia = discoveredByLabel ? 'label' : 'cli';
+  const resolvedSourceKind = sourceKind || (artifactUri || artifactDigest ? 'container_image' : 'git_change');
+
   const payload = cleanUndefined({
     candidate_name: candidateName || `${ctx.eventName}/${sha.slice(0, 7)}`,
     campaign_id: campaignId || undefined,
+    work_item: workItem || undefined,
+    source_kind: resolvedSourceKind,
+    discovered_via: discoveredVia,
     simulation_spec: simulationSpec || undefined,
     execution_recipe: executionRecipe || undefined,
     context_spec: contextSpec || undefined,
@@ -32082,9 +32117,20 @@ async function run() {
   const simRunId = submission.simulation_run_id || submission.simulationRunId || '';
   let effectiveReportUrl = submission.simulation_report_url || submission.reportUrl || '';
 
+  // Campaign context, if the studio returns it. These fields are optional so the
+  // action degrades gracefully when the backend has no campaign comparison yet.
+  const effectiveCampaignId = submission.campaign_id || submission.campaignId || campaignId || '';
+  let campaignUrl = submission.campaign_url || submission.campaignUrl || submission.comparison_url || '';
+  let campaignRank = submission.campaign_rank || submission.rankInCampaign || null;
+  let campaignTotal = submission.campaign_candidate_count || submission.campaignCandidateCount || null;
+
   core.setOutput('candidate-id', candidateId);
   core.setOutput('simulation-run-id', simRunId);
   core.setOutput('simulation-report-url', effectiveReportUrl);
+  core.setOutput('campaign-url', campaignUrl);
+  if (discoveredByLabel) {
+    core.info(`Discovered as campaign candidate via label "${candidateLabel}".`);
+  }
 
   core.info(`Candidate submitted: ${candidateId}`);
   if (effectiveReportUrl) core.info(`Report URL: ${effectiveReportUrl}`);
@@ -32133,6 +32179,16 @@ async function run() {
           core.setOutput('simulation-report-url', effectiveReportUrl);
         }
 
+        const updatedCampaignUrl = status.campaign_url || status.campaignUrl || status.comparison_url || '';
+        if (updatedCampaignUrl && updatedCampaignUrl !== campaignUrl) {
+          campaignUrl = updatedCampaignUrl;
+          core.setOutput('campaign-url', campaignUrl);
+        }
+        if (status.campaign_rank || status.rankInCampaign) campaignRank = status.campaign_rank || status.rankInCampaign;
+        if (status.campaign_candidate_count || status.campaignCandidateCount) {
+          campaignTotal = status.campaign_candidate_count || status.campaignCandidateCount;
+        }
+
         core.info(`Status: ${finalStatus}${finalScore ? ` (score: ${finalScore})` : ''}`);
 
         if (!['pending', 'running', 'queued'].includes(finalStatus)) {
@@ -32152,9 +32208,13 @@ async function run() {
   core.setOutput('simulation-status', finalStatus);
   core.setOutput('simulation-score', finalScore);
 
+  const campaign = effectiveCampaignId
+    ? { id: effectiveCampaignId, url: campaignUrl, rank: campaignRank, total: campaignTotal }
+    : null;
+
   if (publishComment && octokit && prNumber) {
     try {
-      const body = buildCommentBody(candidateId, simRunId, finalStatus, finalScore, effectiveReportUrl);
+      const body = buildCommentBody(candidateId, simRunId, finalStatus, finalScore, effectiveReportUrl, campaign);
       await postPRComment(octokit, owner, repo, prNumber, body);
       core.info('PR comment posted.');
     } catch (e) {
@@ -32165,11 +32225,13 @@ async function run() {
   if (publishCheck && octokit && checkRunId) {
     try {
       const conclusion = { passed: 'success', failed: 'failure', timeout: 'timed_out' }[finalStatus];
+      // Prefer the campaign comparison as the check's deep link when available.
+      const detailsUrl = (campaign && campaign.url) || effectiveReportUrl;
       await updateCheckRun(octokit, owner, repo, checkRunId, {
         status: conclusion ? 'completed' : 'in_progress',
         ...(conclusion && { conclusion, completed_at: new Date().toISOString() }),
-        ...(effectiveReportUrl && { details_url: effectiveReportUrl }),
-        output: buildCheckOutput(candidateId, simRunId, finalStatus, finalScore),
+        ...(detailsUrl && { details_url: detailsUrl }),
+        output: buildCheckOutput(candidateId, simRunId, finalStatus, finalScore, campaign),
       });
       core.info('Check run updated.');
     } catch (e) {

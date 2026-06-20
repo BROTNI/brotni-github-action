@@ -30,6 +30,19 @@ describe('buildCommentBody', () => {
   test('uses the failure emoji for a failed status', () => {
     expect(buildCommentBody('c', '', 'failed', '', '')).toContain('❌');
   });
+
+  test('renders campaign context with rank and comparison link', () => {
+    const body = buildCommentBody('cand-1', '', 'passed', '0.9', 'https://example.com/report', {
+      id: 'camp-1',
+      url: 'https://example.com/campaign',
+      rank: 2,
+      total: 4,
+    });
+    expect(body).toContain('Brotni Simulation Campaign');
+    expect(body).toContain('**Campaign:** `camp-1`');
+    expect(body).toContain('**Campaign candidate:** 2 of 4');
+    expect(body).toContain('[Compare candidates in this campaign](https://example.com/campaign)');
+  });
 });
 
 describe('buildCheckOutput', () => {
@@ -45,6 +58,19 @@ describe('buildCheckOutput', () => {
     const out = buildCheckOutput('cand-2', '', 'pending', '');
     expect(out.summary).not.toContain('Run ID');
     expect(out.summary).not.toContain('Score');
+  });
+
+  test('includes campaign context in the title and summary', () => {
+    const out = buildCheckOutput('cand-1', '', 'passed', '0.9', {
+      id: 'camp-1',
+      url: 'https://example.com/campaign',
+      rank: 1,
+      total: 3,
+    });
+    expect(out.title).toBe('Brotni Simulation Campaign — passed');
+    expect(out.summary).toContain('**Campaign:** `camp-1`');
+    expect(out.summary).toContain('**Campaign candidate:** 1 of 3');
+    expect(out.summary).toContain('[Compare candidates](https://example.com/campaign)');
   });
 });
 
