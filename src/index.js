@@ -70,12 +70,21 @@ async function run() {
   // duplicate. Prefer the PR number; fall back to a branch/sha name.
   const name = candidateName || (prNumber ? `pr-${prNumber}` : `${refName || ctx.eventName}-${sha.slice(0, 7)}`);
 
+  // Ship the recipe content (not just the path) so the studio can resolve it
+  // into an execution at run time. Falls back to a bare reference if unreadable.
+  let recipeContent;
+  if (executionRecipe) {
+    try { recipeContent = fs.readFileSync(executionRecipe, 'utf8'); }
+    catch (e) { core.info(`Recipe ${executionRecipe} not read as a file: ${e.message}`); }
+  }
+
   // Note: the work item is a campaign-level property (set at campaign creation),
   // not a candidate field, so it is intentionally not part of this payload.
   const candidatePayload = cleanUndefined({
     name,
     sourceKind: resolvedSourceKind,
     recipeRef: executionRecipe || undefined,
+    recipe: recipeContent || undefined,
     discoveredVia,
     sourceRef: {
       provider: 'github',
