@@ -14,7 +14,7 @@ jobs:
     name: Run action (smoke test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Run brotni-github-action
         id: brotni
